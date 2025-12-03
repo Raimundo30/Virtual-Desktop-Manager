@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.26100.1</TargetFramework>
+    <RootNamespace>Virtual_Desktop_Manager</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Core\Desktop\" />
+    <Folder Include="Core\IconLayout\" />
+    <Folder Include="Core\Interfaces\" />
+    <Folder Include="Core\Storage\" />
+    <Folder Include="Core\VirtualDesktops\" />
+    <Folder Include="Assets\" />
+    <Folder Include="Docs\" />
+    <Folder Include="Features\CopyPasteFix\" />
+    <Folder Include="Features\FollowAlong\" />
+    <Folder Include="Features\Shortcuts\" />
+    <Folder Include="Tests\" />
+    <Folder Include="UI\AppWindow\" />
+    <Folder Include="UI\TitleBar\" />
+    <Folder Include="UI\TrayIcon\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>
