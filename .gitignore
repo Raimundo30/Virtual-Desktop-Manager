@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Core/Helpers/FileHelper.cs
+/Core/Helpers/ShellHelper.cs
+/Core/Helpers/VirtualDesktop11-24H2.cs
+/Core/Models/DesktopState.cs
+/Core/Models/IconPosition.cs
+/Core/Models/Paths.cs

@@ -1,8 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.26100.1</TargetFramework>
+    <OutputType>Exe</OutputType>
+		<!-- OutputType>WinExe</OutputType -->
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <RootNamespace>Virtual_Desktop_Manager</RootNamespace>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
@@ -10,18 +11,32 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Core\Desktop\" />
-    <Folder Include="Core\IconLayout\" />
-    <Folder Include="Core\Interfaces\" />
-    <Folder Include="Core\Storage\" />
-    <Folder Include="Core\VirtualDesktops\" />
+    <Compile Remove="Core\Desktop\**" />
+    <Compile Remove="Core\IconLayout\**" />
+    <Compile Remove="Core\Interfaces\**" />
+    <Compile Remove="Core\Storage\**" />
+    <Compile Remove="Core\VirtualDesktops\**" />
+    <Compile Remove="Tests\**" />
+    <EmbeddedResource Remove="Core\Desktop\**" />
+    <EmbeddedResource Remove="Core\IconLayout\**" />
+    <EmbeddedResource Remove="Core\Interfaces\**" />
+    <EmbeddedResource Remove="Core\Storage\**" />
+    <EmbeddedResource Remove="Core\VirtualDesktops\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Core\Desktop\**" />
+    <None Remove="Core\IconLayout\**" />
+    <None Remove="Core\Interfaces\**" />
+    <None Remove="Core\Storage\**" />
+    <None Remove="Core\VirtualDesktops\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Assets\" />
     <Folder Include="Docs\" />
     <Folder Include="Features\CopyPasteFix\" />
     <Folder Include="Features\FollowAlong\" />
     <Folder Include="Features\Shortcuts\" />
-    <Folder Include="Tests\" />
-    <Folder Include="UI\AppWindow\" />
     <Folder Include="UI\TitleBar\" />
     <Folder Include="UI\TrayIcon\" />
   </ItemGroup>
