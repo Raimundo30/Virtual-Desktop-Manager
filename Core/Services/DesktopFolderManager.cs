@@ -158,22 +158,35 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// </summary>
 		public void RefreshDesktop()
 		{
-			// Notify the shell that associations have changed
-			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+			Console.WriteLine("[DesktopFolderManager] Refreshing desktop...");
 
-			// Also send a refresh command to the desktop window
-			IntPtr desktopHandle = FindWindow("Progman", "Program Manager");
-			if (desktopHandle != IntPtr.Zero)
+			// Method 1: Notify the shell that associations have changed
+			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+			Console.WriteLine("[DesktopFolderManager] SHChangeNotify sent.");
+
+			// Method 2: Send refresh to Progman (main desktop window)
+			IntPtr progmanHandle = FindWindow("Progman", "Program Manager");
+			if (progmanHandle != IntPtr.Zero)
 			{
-				SendMessage(desktopHandle, WM_COMMAND, (int)FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
+				SendMessage(progmanHandle, WM_COMMAND, FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
+				Console.WriteLine("[DesktopFolderManager] Refresh sent to Progman.");
 			}
 
-			// Additionally, enumerate all top-level windows and send refresh command
-			EnumWindows((hWnd, _) =>
+			// Method 3: Find and refresh all Shell_TrayWnd windows (taskbar)
+			IntPtr trayHandle = FindWindow("Shell_TrayWnd", null);
+			if (trayHandle != IntPtr.Zero)
 			{
-				SendMessage(hWnd, WM_COMMAND, FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
-				return true; // continue enumeration
-			}, IntPtr.Zero);
+				SendMessage(trayHandle, WM_COMMAND, FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
+				Console.WriteLine("[DesktopFolderManager] Refresh sent to Shell_TrayWnd.");
+			}
+
+			// Method 4: Broadcast WM_SETTINGCHANGE to notify all windows
+			//const int HWND_BROADCAST = 0xFFFF;
+			//const uint WM_SETTINGCHANGE = 0x001A;
+			//SendMessage(new IntPtr(HWND_BROADCAST), WM_SETTINGCHANGE, IntPtr.Zero, IntPtr.Zero);
+			//Console.WriteLine("[DesktopFolderManager] WM_SETTINGCHANGE broadcast sent.");
+
+			Console.WriteLine("[DesktopFolderManager] Desktop refresh completed.");
 		}
 
 		#region Native interop
@@ -195,19 +208,12 @@ namespace Virtual_Desktop_Manager.Core.Services
 		private static extern void SHChangeNotify(uint wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
 
 		// FindWindow
-		[DllImport("user32.dll")]
-		private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-		// EnumWindows
-		[DllImport("user32.dll")]
-		private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-		// EnumWindows callback delegate
-		private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
 		// SendMessage
-		[DllImport("user32.dll")]
-		private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, int wParam, IntPtr lParam);
+		[DllImport("user32.dll", CharSet = CharSet.Auto)]
+		private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
 		#endregion
 	}

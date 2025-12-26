@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Virtual_Desktop_Manager.Core.Services;
 
@@ -22,6 +23,12 @@ namespace Virtual_Desktop_Manager.Core
 		private readonly DesktopFolderManager _folderManager;
 		private readonly IconLayoutManager _iconManager;
 		private readonly CleanupManager _cleanupManager;
+
+		/// <summary>
+		/// Internal flag to prevent re-entrant desktop switching during desktop change operations.
+		/// 0 = not processing, 1 = processing
+		/// </summary>
+		private int _isProcessing = 0;
 
 		/// <summary>
 		/// Event fired when a desktop switch is completed.
@@ -62,6 +69,7 @@ namespace Virtual_Desktop_Manager.Core
 		public void Start()
 		{
 			_monitor.Start();
+
 			OnDesktopChanged(_monitor.LastDesktopId);
 		}
 
@@ -82,10 +90,18 @@ namespace Virtual_Desktop_Manager.Core
 		/// <param name="desktopId">The GUID of the new active desktop.</param>
 		private void OnDesktopChanged(Guid desktopId)
 		{
-			_monitor._isPaused = true;
+			// Atomically check if already processing and set flag if not
+			// Returns the OLD value: if it was 1 (processing), another operation is running
+			if (Interlocked.CompareExchange(ref _isProcessing, 1, 0) == 1)
+			{
+				Console.WriteLine($"[AppCore] Desktop switch already in progress, ignoring event for {desktopId}");
+				return;
+			}
 
 			try
 			{
+				Console.WriteLine($"[AppCore] Processing desktop switch to {desktopId}");
+
 				// 1. Save icon layout for the old desktop
 				_iconManager.SaveLayout();
 
@@ -95,11 +111,14 @@ namespace Virtual_Desktop_Manager.Core
 				// 3. Switch Windows Desktop path to the new folder
 				_folderManager.SwitchDesktopPath(newFolder);
 
-				// 4. Load icon layout for the new desktop
-				_iconManager.LoadLayout();
-
-				// 5. Refresh the desktop environment
+				// 4. Refresh the desktop environment
 				_folderManager.RefreshDesktop();
+
+				// 4.1 Wait a moment to ensure Explorer has updated (mininum 200ms)
+				WaitForDesktopRefresh(newFolder);
+
+				// 5. Load icon layout for the new desktop
+				_iconManager.LoadLayout();
 
 				// 6. Run cleanup for unused folders and layouts
 				List<Guid> activeDesktops = _monitor.ListDesktopIds();
@@ -112,8 +131,46 @@ namespace Virtual_Desktop_Manager.Core
 			{
 				ErrorOccurred?.Invoke(ex);
 			}
+			finally
+			{
+				// Atomically reset the flag to allow next operation
+				Interlocked.Exchange(ref _isProcessing, 0);
 
-			_monitor._isPaused = false;
+				// Update last desktop ID
+				_monitor.LastDesktopId = desktopId;
+
+				Console.WriteLine($"[AppCore] Desktop switch completed, flag reset");
+			}
+		}
+
+		/// <summary>
+		/// Waits for the desktop to refresh by verifying the desktop path has changed.
+		/// </summary>
+		/// <param name="expectedFolder">The folder path that should be active on the desktop.</param>
+		private void WaitForDesktopRefresh(string expectedFolder)
+		{
+			const int delayMs = 100;
+			const int maxAttempts = 20; // Maximum 2 seconds (20 * 100ms)
+
+			for (int i = 0; i < maxAttempts; i++)
+			{
+				// Verify the desktop path has actually changed in the registry/system
+				string currentPath = _folderManager.GetCurrentDesktopPath();
+				string normalizedCurrent = Path.GetFullPath(currentPath).TrimEnd(Path.DirectorySeparatorChar);
+				string normalizedExpected = Path.GetFullPath(expectedFolder).TrimEnd(Path.DirectorySeparatorChar);
+
+				if (string.Equals(normalizedCurrent, normalizedExpected, StringComparison.OrdinalIgnoreCase))
+				{
+					Console.WriteLine($"[AppCore] Desktop path verified after {i * delayMs}ms");
+					// Give Explorer a bit more time to actually render icons
+					Thread.Sleep(200);
+					return;
+				}
+
+				Thread.Sleep(delayMs);
+			}
+
+			Console.WriteLine($"[AppCore] Warning: Desktop path verification timeout after {maxAttempts * delayMs}ms");
 		}
 
 		/// <summary>

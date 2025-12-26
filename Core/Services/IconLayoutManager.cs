@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
+using Virtual_Desktop_Manager.Core.Helpers;
+using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Services
 {
@@ -43,9 +43,8 @@ namespace Virtual_Desktop_Manager.Core.Services
 		}
 
 		/// <summary>
-		/// Saves the icon layout for the given desktop.
-		/// The GUID is still passed, but for the original Desktop
-		/// a special file name is used instead.
+		/// Saves the icon layout for the current desktop.
+		/// Captures icon positions across all screens.
 		/// </summary>
 		public void SaveLayout()
 		{
@@ -53,42 +52,83 @@ namespace Virtual_Desktop_Manager.Core.Services
 			{
 				string filePath = GetLayoutFilePath();
 
-				// TODO: Capture real icon layout and serialize it
+				// Capture current icon positions
+				var iconPositions = DesktopIconHelper.GetIconPositions();
+				Console.WriteLine($"[IconLayoutManager] Captured {iconPositions.Count} icons");
 
-				File.WriteAllText(filePath, "{ /* icon layout placeholder */ }");
+				// Capture current screen configuration
+				var screenConfig = DesktopIconHelper.GetScreenConfiguration();
+				Console.WriteLine($"[IconLayoutManager] Screen config: {screenConfig.Screens.Count} screen(s)");
+
+				// Create layout object
+				var layout = new DesktopLayout
+				{
+					Icons = iconPositions,
+					ScreenConfig = screenConfig,
+					SavedAt = DateTime.Now
+				};
+
+				// Serialize to JSON
+				var options = new JsonSerializerOptions
+				{
+					WriteIndented = true
+				};
+				string json = JsonSerializer.Serialize(layout, options);
+
+				// Save to file
+				File.WriteAllText(filePath, json);
+				Console.WriteLine($"[IconLayoutManager] Saved layout to: {Path.GetFileName(filePath)}");
 			}
 			catch (Exception ex)
 			{
+				Console.WriteLine($"[IconLayoutManager] SaveLayout error: {ex.Message}");
 				ErrorOccurred?.Invoke(ex);
 			}
 		}
 
 		/// <summary>
-		/// Loads the icon layout for the given desktop if it exists.
-		/// The GUID is still passed, but a special file is used
-		/// for the original Desktop.
+		/// Loads the icon layout for the current desktop if it exists.
+		/// Adapts positions for current screen configuration.
 		/// </summary>
 		public void LoadLayout()
 		{
 			try
 			{
 				string filePath = GetLayoutFilePath();
-				if (File.Exists(filePath))
+				if (!File.Exists(filePath))
 				{
-					string layoutJson = File.ReadAllText(filePath);
-					// TODO: Implement actual desktop icon positioning.
+					Console.WriteLine($"[IconLayoutManager] No layout file found: {Path.GetFileName(filePath)}");
+					return;
 				}
+
+				// Read and deserialize layout
+				string json = File.ReadAllText(filePath);
+				var layout = JsonSerializer.Deserialize<DesktopLayout>(json);
+
+				if (layout == null || layout.Icons.Count == 0)
+					return;
+
+				// Get current screen configuration
+				var currentScreenConfig = DesktopIconHelper.GetScreenConfiguration();
+
+				// Apply icon positions with screen configuration adaptation
+				DesktopIconHelper.SetIconPositions(
+					layout.Icons,
+					currentScreenConfig,
+					layout.ScreenConfig
+				);
+
+				Console.WriteLine($"[IconLayoutManager] Layout loaded successfully");
 			}
 			catch (Exception ex)
 			{
+				Console.WriteLine($"[IconLayoutManager] LoadLayout error: {ex.Message}");
 				ErrorOccurred?.Invoke(ex);
 			}
 		}
 
 		/// <summary>
-		/// Determines the correct filename for the layout:
-		/// - "Layout_OriginalDesktop.json" for the original Desktop
-		/// - "Layout_<GUID>.json" otherwise
+		/// Determines the correct filename for the layout.
 		/// </summary>
 		private string GetLayoutFilePath()
 		{

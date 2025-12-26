@@ -24,14 +24,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		public event Action<Guid>? DesktopChanged;
 
 		/// <summary>
-		/// Internal flag to prevent re-entrant desktop switching during desktop change operations.
-		/// </summary>
-		public bool _isPaused = false;
-
-		/// <summary>
 		/// Gets the ID of the last known virtual desktop.
 		/// </summary>
-		public Guid LastDesktopId { get; private set; }
+		public Guid LastDesktopId { get; set; }
 
 		/// <summary>
 		/// Gets or sets the polling interval in milliseconds for checking desktop changes.
@@ -206,19 +201,14 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// </summary>
 		private void TimerElapsed(object? sender, ElapsedEventArgs e)
 		{
-			// Prevent re-entrant calls
-			if (_isPaused == true)
-				return;
-
 			Guid currentId = GetCurrentDesktopId();
 
 			if (currentId != LastDesktopId)
 			{
-				// Update LastDesktopId
-				LastDesktopId = currentId;
-
 				// Raise event with old and new desktop IDs
 				DesktopChanged?.Invoke(currentId);
+
+				// LastDesktopId will be updated by the event handler
 
 			}
 		}
