@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Timers;
@@ -8,10 +9,11 @@ using static Virtual_Desktop_Manager.Core.Helpers.VirtualDesktopInterop;
 namespace Virtual_Desktop_Manager.Core.Services
 {
 	/// <summary>
-	/// Monitors virtual desktop changes by periodically checking the current desktop ID.
-	/// Raises an event whenever a change is detected.
+	/// Provides virtual desktop services including monitoring desktop changes and performing desktop operations.
+	/// Monitors changes by periodically checking the current desktop ID and raises events when changes are detected.
+	/// Also provides methods to switch desktops and retrieve desktop information.
 	/// </summary>
-	public class VirtualDesktopMonitor : IDisposable
+	public class VirtualDesktopService : IDisposable
 	{
 		/// <summary>
 		/// Occurs when an error is encountered during operation.
@@ -41,9 +43,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		private VirtualDesktopInterop.IVirtualDesktopManagerInternal? _vdmInternal;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="VirtualDesktopMonitor"/> class.
+		/// Initializes a new instance of the <see cref="VirtualDesktopService"/> class.
 		/// </summary>
-		public VirtualDesktopMonitor()
+		public VirtualDesktopService()
 		{
 			_timer = new System.Timers.Timer(PollingIntervalMs);
 			_timer.Elapsed += TimerElapsed;
@@ -208,7 +210,7 @@ namespace Virtual_Desktop_Manager.Core.Services
 				// Raise event with old and new desktop IDs
 				DesktopChanged?.Invoke(currentId);
 
-				// LastDesktopId will be updated by the event handler
+				// LastDesktopId will be updated after desktop switch is fully processed
 
 			}
 		}
@@ -259,6 +261,157 @@ namespace Virtual_Desktop_Manager.Core.Services
 
 			return desktopIds;
 		}
+
+		/// <summary>
+		/// Gets information about all virtual desktops (ID and Name).
+		/// </summary>
+		/// <returns>Dictionary mapping desktop GUIDs to their names.</returns>
+		public Dictionary<Guid, string> GetDesktopInfo()
+		{
+			var desktopInfo = new Dictionary<Guid, string>();
+
+			if (_vdmInternal == null)
+				return desktopInfo;
+
+			try
+			{
+				_vdmInternal.GetDesktops(out IObjectArray desktops);
+				desktops.GetCount(out int count);
+
+				var iid = typeof(VirtualDesktopInterop.IVirtualDesktop).GUID;
+
+				for (int i = 0; i < count; i++)
+				{
+					desktops.GetAt(i, ref iid, out object obj);
+					if (obj is VirtualDesktopInterop.IVirtualDesktop desktop)
+					{
+						Guid id = desktop.GetId();
+						Debug.WriteLine($"[VirtualDesktopService] Desktop {i}: ID = {id}");
+
+						string name = string.Empty;
+						try
+						{
+							Debug.WriteLine($"[VirtualDesktopService] Calling GetName() for desktop {i}");
+							IntPtr namePtr = desktop.GetName();
+							Debug.WriteLine($"[VirtualDesktopService] GetName() returned IntPtr: 0x{namePtr:X}");
+
+							if (namePtr != IntPtr.Zero)
+							{
+								// Use WindowsGetStringRawBuffer instead of PtrToStringUni for HSTRING
+								uint length = 0;
+								IntPtr buffer = WindowsGetStringRawBuffer(namePtr, out length);
+
+								if (buffer != IntPtr.Zero && length > 0)
+								{
+									name = Marshal.PtrToStringUni(buffer, (int)length) ?? string.Empty;
+									Debug.WriteLine($"[VirtualDesktopService] Converted to string: '{name}' (length: {length})");
+								}
+								else
+								{
+									Debug.WriteLine($"[VirtualDesktopService] HSTRING buffer is null or empty");
+								}
+
+								// Free the HSTRING memory
+								try
+								{
+									WindowsDeleteString(namePtr);
+									Debug.WriteLine($"[VirtualDesktopService] Successfully freed HSTRING");
+								}
+								catch (Exception freeEx)
+								{
+									Debug.WriteLine($"[VirtualDesktopService] Failed to free HSTRING: {freeEx.Message}");
+								}
+							}
+							else
+							{
+								Debug.WriteLine($"[VirtualDesktopService] GetName() returned null pointer");
+							}
+						}
+						catch (Exception ex)
+						{
+							// If GetName() fails, we'll use the default name below
+							Debug.WriteLine($"[VirtualDesktopService] Exception in GetName(): {ex.GetType().Name}: {ex.Message}");
+							name = string.Empty;
+						}
+
+						// If name is empty, use a default name with index
+						if (string.IsNullOrWhiteSpace(name))
+						{
+							name = $"Desktop {i + 1}";
+							Debug.WriteLine($"[VirtualDesktopService] Using default name: '{name}'");
+						}
+						else
+						{
+							Debug.WriteLine($"[VirtualDesktopService] Using retrieved name: '{name}'");
+						}
+
+						desktopInfo[id] = name;
+
+						// Release COM object immediately
+						if (Marshal.IsComObject(desktop))
+							Marshal.ReleaseComObject(desktop);
+					}
+				}
+
+				// Release the IObjectArray
+				if (Marshal.IsComObject(desktops))
+					Marshal.ReleaseComObject(desktops);
+			}
+			catch (COMException ex)
+			{
+				ErrorOccurred?.Invoke(ex);
+				Debug.WriteLine($"[VirtualDesktopService] COM Exception: {ex.Message}");
+			}
+			catch (Exception ex)
+			{
+				ErrorOccurred?.Invoke(ex);
+				Debug.WriteLine($"[VirtualDesktopService] Exception: {ex.Message}");
+			}
+
+			return desktopInfo;
+		}
+
+		/// <summary>
+		/// Switches to a specific virtual desktop by its ID.
+		/// </summary>
+		/// <param name="desktopId">The ID of the desktop to switch to.</param>
+		/// <returns>True if successful, false otherwise.</returns>
+		public bool SwitchToDesktop(Guid desktopId)
+		{
+			if (_vdmInternal == null)
+				return false;
+
+			try
+			{
+				var desktop = _vdmInternal.FindDesktop(ref desktopId);
+				if (desktop != null)
+				{
+					_vdmInternal.SwitchDesktop(desktop);
+
+					// Release COM object
+					if (Marshal.IsComObject(desktop))
+						Marshal.ReleaseComObject(desktop);
+
+					return true;
+				}
+			}
+			catch (COMException ex)
+			{
+				ErrorOccurred?.Invoke(ex);
+			}
+			catch (Exception ex)
+			{
+				ErrorOccurred?.Invoke(ex);
+			}
+
+			return false;
+		}
+
+		[DllImport("api-ms-win-core-winrt-string-l1-1-0.dll", CallingConvention = CallingConvention.StdCall)]
+		private static extern IntPtr WindowsGetStringRawBuffer(IntPtr hstring, out uint length);
+
+		[DllImport("api-ms-win-core-winrt-string-l1-1-0.dll", CallingConvention = CallingConvention.StdCall)]
+		private static extern int WindowsDeleteString(IntPtr hstring);
 
 		/// <summary>
 		/// Releases all resources used by the current instance.

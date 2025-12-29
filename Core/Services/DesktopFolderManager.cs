@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Windows.Forms.VisualStyles;
+using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Services
 {
@@ -19,16 +23,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// </summary>
 		public event Action<Exception>? ErrorOccurred;
 
-		/// <summary>
-		/// Root folder where all virtual desktop folders are stored.
-		/// Example: %UserProfile%\Desktops_VDM
-		/// </summary>
-		private string RootFolderPath { get; }
-
-		/// <summary>
-		/// User profile path, e.g. C:\Users\<UserName>
-		/// </summary>
-		private readonly string _userProfilePath;
+		private readonly string _rootFolderPath;
+		private readonly string _defaultDesktopPath;
+		private readonly string _iconPath;
 
 		/// <summary>
 		/// Special GUID used by SHSetKnownFolderPath for the Desktop folder.
@@ -39,15 +36,72 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// <summary>
 		/// Initializes a new instance of the <see cref="DesktopFolderManager"/> class.
 		/// </summary>
-		/// <param name="RootFolderPath">Root folder for virtual desktops.</param>
-		/// <param name="UserProfilePath">User profile path.</param>
-		public DesktopFolderManager(string RootFolderPath, string UserProfilePath)
+		/// <param name="paths">Paths configuration.</param>
+		public DesktopFolderManager(Paths paths)
 		{
-			_userProfilePath = UserProfilePath;
-			this.RootFolderPath = RootFolderPath;
+			_defaultDesktopPath = paths.DefaultDesktop;
+			_rootFolderPath = paths.Root;
+			_iconPath = paths.Icon;
 
-			if (!Directory.Exists(this.RootFolderPath))
-				Directory.CreateDirectory(this.RootFolderPath);
+			if (!Directory.Exists(_rootFolderPath))
+				Directory.CreateDirectory(_rootFolderPath);
+
+			// Set folder icon for root folder
+			SetRootFolderIcon();
+		}
+
+		/// <summary>
+		/// Sets the custom icon for the Desktops_VDM root folder.
+		/// Uses SHGetSetFolderCustomSettings to set the icon, which forces an immediate update.
+		/// </summary>
+		private void SetRootFolderIcon()
+		{
+			try
+			{
+				Debug.WriteLine($"[DesktopFolderManager] === SetRootFolderIcon START ===");
+				Debug.WriteLine($"[DesktopFolderManager] Root folder: {_rootFolderPath}");
+				Debug.WriteLine($"[DesktopFolderManager] Icon path: {_iconPath}");
+				Debug.WriteLine($"[DesktopFolderManager] Icon exists: {File.Exists(_iconPath)}");
+
+				if (!File.Exists(_iconPath))
+				{
+					Debug.WriteLine($"[DesktopFolderManager] ERROR: Icon file not found at: {_iconPath}");
+					return;
+				}
+
+				// Use SHFOLDERCUSTOMSETTINGS to set the icon
+				SHFOLDERCUSTOMSETTINGS fcs = new SHFOLDERCUSTOMSETTINGS
+				{
+					dwSize = (uint)Marshal.SizeOf(typeof(SHFOLDERCUSTOMSETTINGS)),
+					dwMask = FCSM_ICONFILE,
+					pszIconFile = _iconPath,
+					cchIconFile = 0,
+					iIconIndex = 0
+				};
+
+				int hr = SHGetSetFolderCustomSettings(ref fcs, _rootFolderPath, FCS_FORCEWRITE);
+
+				if (hr == 0)
+				{
+					Debug.WriteLine($"[DesktopFolderManager] SHGetSetFolderCustomSettings succeeded");
+				}
+				else
+				{
+					Debug.WriteLine($"[DesktopFolderManager] SHGetSetFolderCustomSettings failed with HRESULT: 0x{hr:X8}");
+				}
+
+				// Notify Windows Explorer to refresh the folder
+				//SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSH, Marshal.StringToHGlobalUni(_rootFolderPath), IntPtr.Zero);
+				//Debug.WriteLine($"[DesktopFolderManager] Shell notified with SHCNE_UPDATEITEM");
+
+				//Debug.WriteLine($"[DesktopFolderManager] === SetRootFolderIcon COMPLETE ===");
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine($"[DesktopFolderManager] ERROR in SetRootFolderIcon: {ex.Message}");
+				Debug.WriteLine($"[DesktopFolderManager] Stack trace: {ex.StackTrace}");
+				ErrorOccurred?.Invoke(ex);
+			}
 		}
 
 		/// <summary>
@@ -59,9 +113,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		public string GetFolderForDesktop(Guid desktopId)
 		{
 			if (desktopId == Guid.Empty)
-				return Path.Combine(_userProfilePath, "Desktop");
+				return _defaultDesktopPath;
 
-			string path = Path.Combine(RootFolderPath, $"Desktop_{desktopId}");
+			string path = Path.Combine(_rootFolderPath, $"Desktop_{desktopId}");
 
 			if (!Directory.Exists(path))
 				Directory.CreateDirectory(path);
@@ -158,18 +212,18 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// </summary>
 		public void RefreshDesktop()
 		{
-			Console.WriteLine("[DesktopFolderManager] Refreshing desktop...");
+			Debug.WriteLine("[DesktopFolderManager] Refreshing desktop...");
 
 			// Method 1: Notify the shell that associations have changed
 			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-			Console.WriteLine("[DesktopFolderManager] SHChangeNotify sent.");
+			Debug.WriteLine("[DesktopFolderManager] SHChangeNotify sent.");
 
 			// Method 2: Send refresh to Progman (main desktop window)
 			IntPtr progmanHandle = FindWindow("Progman", "Program Manager");
 			if (progmanHandle != IntPtr.Zero)
 			{
 				SendMessage(progmanHandle, WM_COMMAND, FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
-				Console.WriteLine("[DesktopFolderManager] Refresh sent to Progman.");
+				Debug.WriteLine("[DesktopFolderManager] Refresh sent to Progman.");
 			}
 
 			// Method 3: Find and refresh all Shell_TrayWnd windows (taskbar)
@@ -177,23 +231,52 @@ namespace Virtual_Desktop_Manager.Core.Services
 			if (trayHandle != IntPtr.Zero)
 			{
 				SendMessage(trayHandle, WM_COMMAND, FCIDM_SHVIEW_REFRESH, IntPtr.Zero);
-				Console.WriteLine("[DesktopFolderManager] Refresh sent to Shell_TrayWnd.");
+				Debug.WriteLine("[DesktopFolderManager] Refresh sent to Shell_TrayWnd.");
 			}
 
-			// Method 4: Broadcast WM_SETTINGCHANGE to notify all windows
-			//const int HWND_BROADCAST = 0xFFFF;
-			//const uint WM_SETTINGCHANGE = 0x001A;
-			//SendMessage(new IntPtr(HWND_BROADCAST), WM_SETTINGCHANGE, IntPtr.Zero, IntPtr.Zero);
-			//Console.WriteLine("[DesktopFolderManager] WM_SETTINGCHANGE broadcast sent.");
-
-			Console.WriteLine("[DesktopFolderManager] Desktop refresh completed.");
+			Debug.WriteLine("[DesktopFolderManager] Desktop refresh completed.");
 		}
 
 		#region Native interop
 		private const uint SHCNE_ASSOCCHANGED = 0x08000000;
+		private const uint SHCNE_UPDATEITEM = 0x00002000;
 		private const uint SHCNF_IDLIST = 0x0000;
 		private const uint WM_COMMAND = 0x0111;
 		private const int FCIDM_SHVIEW_REFRESH = 0xA220;
+
+		// Flags for SHFOLDERCUSTOMSETTINGS
+		private const uint FCSM_ICONFILE = 0x00000010;
+		private const uint FCS_FORCEWRITE = 0x00000002;
+
+		// SHFOLDERCUSTOMSETTINGS structure
+		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+		private struct SHFOLDERCUSTOMSETTINGS
+		{
+			public uint dwSize;
+			public uint dwMask;
+			public IntPtr pvid;
+			[MarshalAs(UnmanagedType.LPWStr)]
+			public string? pszWebViewTemplate;
+			public uint cchWebViewTemplate;
+			[MarshalAs(UnmanagedType.LPWStr)]
+			public string? pszWebViewTemplateVersion;
+			[MarshalAs(UnmanagedType.LPWStr)]
+			public string? pszInfoTip;
+			public uint cchInfoTip;
+			public IntPtr pclsid;
+			public uint dwFlags;
+			[MarshalAs(UnmanagedType.LPWStr)]
+			public string? pszIconFile;
+			public uint cchIconFile;
+			public int iIconIndex;
+			[MarshalAs(UnmanagedType.LPWStr)]
+			public string? pszLogo;
+			public uint cchLogo;
+		}
+
+		// SHGetSetFolderCustomSettings
+		[DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+		private static extern int SHGetSetFolderCustomSettings(ref SHFOLDERCUSTOMSETTINGS pfcs, string pszPath, uint dwReadWrite);
 
 		// SHGetKnownFolderPath
 		[DllImport("shell32.dll")]

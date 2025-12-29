@@ -1,17 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-		<!-- OutputType>WinExe</OutputType -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <RootNamespace>Virtual_Desktop_Manager</RootNamespace>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyTitle>Virtual Desktop Manager</AssemblyTitle>
+    <ApplicationIcon>main.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Core\Desktop\**" />
+		<Compile Remove="Core\Desktop\**" />
     <Compile Remove="Core\IconLayout\**" />
     <Compile Remove="Core\Interfaces\**" />
     <Compile Remove="Core\Storage\**" />
@@ -29,16 +30,21 @@
     <None Remove="Core\Storage\**" />
     <None Remove="Core\VirtualDesktops\**" />
     <None Remove="Tests\**" />
+		<None Include="main.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Assets\" />
     <Folder Include="Docs\" />
     <Folder Include="Features\CopyPasteFix\" />
     <Folder Include="Features\FollowAlong\" />
     <Folder Include="Features\Shortcuts\" />
     <Folder Include="UI\TitleBar\" />
-    <Folder Include="UI\TrayIcon\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
   </ItemGroup>
 
   <ItemGroup>

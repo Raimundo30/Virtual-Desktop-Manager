@@ -1,9 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Virtual_Desktop_Manager.Core.Helpers
 {
@@ -102,8 +98,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 		{
 			bool IsViewVisible(IApplicationView view);
 			Guid GetId();
-			[return: MarshalAs(UnmanagedType.HString)]
-			string GetName();
+			IntPtr GetName();
 		}
 
 		/// <summary>

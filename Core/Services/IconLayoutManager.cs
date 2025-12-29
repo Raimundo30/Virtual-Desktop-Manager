@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text.Json;
 using Virtual_Desktop_Manager.Core.Helpers;
 using Virtual_Desktop_Manager.Core.Models;
@@ -54,11 +55,11 @@ namespace Virtual_Desktop_Manager.Core.Services
 
 				// Capture current icon positions
 				var iconPositions = DesktopIconHelper.GetIconPositions();
-				Console.WriteLine($"[IconLayoutManager] Captured {iconPositions.Count} icons");
+				Debug.WriteLine($"[IconLayoutManager] Captured {iconPositions.Count} icons");
 
 				// Capture current screen configuration
 				var screenConfig = DesktopIconHelper.GetScreenConfiguration();
-				Console.WriteLine($"[IconLayoutManager] Screen config: {screenConfig.Screens.Count} screen(s)");
+				Debug.WriteLine($"[IconLayoutManager] Screen config: {screenConfig.Screens.Count} screen(s)");
 
 				// Create layout object
 				var layout = new DesktopLayout
@@ -77,11 +78,11 @@ namespace Virtual_Desktop_Manager.Core.Services
 
 				// Save to file
 				File.WriteAllText(filePath, json);
-				Console.WriteLine($"[IconLayoutManager] Saved layout to: {Path.GetFileName(filePath)}");
+				Debug.WriteLine($"[IconLayoutManager] Saved layout to: {Path.GetFileName(filePath)}");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[IconLayoutManager] SaveLayout error: {ex.Message}");
+				Debug.WriteLine($"[IconLayoutManager] SaveLayout error: {ex.Message}");
 				ErrorOccurred?.Invoke(ex);
 			}
 		}
@@ -97,7 +98,7 @@ namespace Virtual_Desktop_Manager.Core.Services
 				string filePath = GetLayoutFilePath();
 				if (!File.Exists(filePath))
 				{
-					Console.WriteLine($"[IconLayoutManager] No layout file found: {Path.GetFileName(filePath)}");
+					Debug.WriteLine($"[IconLayoutManager] No layout file found: {Path.GetFileName(filePath)}");
 					return;
 				}
 
@@ -118,11 +119,11 @@ namespace Virtual_Desktop_Manager.Core.Services
 					layout.ScreenConfig
 				);
 
-				Console.WriteLine($"[IconLayoutManager] Layout loaded successfully");
+				Debug.WriteLine($"[IconLayoutManager] Layout loaded successfully");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[IconLayoutManager] LoadLayout error: {ex.Message}");
+				Debug.WriteLine($"[IconLayoutManager] LoadLayout error: {ex.Message}");
 				ErrorOccurred?.Invoke(ex);
 			}
 		}

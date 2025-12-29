@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Services
 {
@@ -9,53 +10,44 @@ namespace Virtual_Desktop_Manager.Core.Services
 	/// </summary>
 	public class CleanupManager
 	{
+		private readonly string _desktopsFolder;
+		private readonly string _layoutsFolder;
+		private readonly string _binFolder;
+
 		/// <summary>
 		/// Occurs when an error is encountered during operation.
 		/// </summary>
 		public event Action<Exception>? ErrorOccurred;
 
 		/// <summary>
-		/// Root folder where all virtual desktop folders are stored.
-		/// Example: %UserProfile%\Desktops_VDM
-		/// </summary>
-		public string DesktopRoot { get; }
-
-		/// <summary>
-		/// Root folder where icon layout files are stored.
-		/// Example:  %UserProfile%\Desktops_VDM\Layouts
-		/// </summary>
-		public string LayoutRoot { get; }
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="CleanupManager"/> class.
 		/// </summary>
-		/// <param name="desktopRoot">Root folder of virtual desktops.</param>
-		/// <param name="layoutRoot">Root folder of saved icon layouts.</param>
-		public CleanupManager(string desktopRoot, string layoutRoot)
+		/// <param name="paths">Paths configuration.</param>
+		public CleanupManager(Paths paths)
 		{
-			DesktopRoot = desktopRoot;
-			LayoutRoot = layoutRoot;
+			_desktopsFolder = paths.Root;
+			_binFolder = paths.Bin;
+			_layoutsFolder = paths.Layouts;
 		}
 
 		/// <summary>
 		/// Deletes or moves unused virtual desktop folders.
+		/// - Only Desktop_<GUID> folders are processed (system folders like Bin, Layouts, Common are ignored)
 		/// - Folders corresponding to active desktops are kept
 		/// - Empty folders are deleted
-		/// - Non-empty folders are moved to DesktopRoot\Bin
+		/// - Non-empty folders have their contents moved to Bin, then the empty folder is deleted
 		/// </summary>
 		/// <param name="activeDesktopIds">List of currently active desktop IDs.</param>
 		public void CleanupUnusedDesktopFolders(List<Guid> activeDesktopIds)
 		{
-			string binFolder = Path.Combine(DesktopRoot, "Bin");
-
 			// Ensure the Bin folder exists
-			if (!Directory.Exists(binFolder))
-				Directory.CreateDirectory(binFolder);
+			if (!Directory.Exists(_binFolder))
+				Directory.CreateDirectory(_binFolder);
 
-			if (!Directory.Exists(DesktopRoot))
+			if (!Directory.Exists(_desktopsFolder))
 				return;
 
-			var desktopFolders = Directory.GetDirectories(DesktopRoot);
+			var desktopFolders = Directory.GetDirectories(_desktopsFolder);
 
 			foreach (var folder in desktopFolders)
 			{
@@ -74,27 +66,33 @@ namespace Virtual_Desktop_Manager.Core.Services
 					continue;
 
 				// Check if folder is empty
-				if (Directory.GetFileSystemEntries(folder).Length == 0)
+				if (Directory.GetFileSystemEntries(folder).Length != 0)
 				{
-					// Safe to delete empty folder
-					Directory.Delete(folder, false);
-				}
-				else
-				{
-					// Move non-empty folder to Bin
-					string dest = Path.Combine(binFolder, folderName);
-
-					// Ensure destination does not overwrite an existing folder
-					int counter = 1;
-					string originalDest = dest;
-					while (Directory.Exists(dest))
+					// Move each item to Bin
+					var entries = Directory.GetFileSystemEntries(folder);
+					foreach (var entry in entries)
 					{
-						dest = originalDest + $"_{counter}";
-						counter++;
-					}
+						string destPath = Path.Combine(_binFolder, Path.GetFileName(entry));
+						
+						// Ensure destination does not overwrite an existing file/folder
+						int counter = 1;
+						string originalDest = destPath;
+						while (File.Exists(destPath) || Directory.Exists(destPath))
+						{
+							destPath = originalDest + $"_{counter}";
+							counter++;
+						}
 
-					Directory.Move(folder, dest);
+						// Move file or directory
+						if (File.Exists(entry))
+							File.Move(entry, destPath);
+						else if (Directory.Exists(entry))
+							Directory.Move(entry, destPath);
+					}
 				}
+
+				// Safe to delete empty folder
+				Directory.Delete(folder, false);
 			}
 		}
 
@@ -105,10 +103,10 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// <param name="activeDesktopIds">List of currently active desktop IDs.</param>
 		public void CleanupUnusedLayoutFiles(List<Guid> activeDesktopIds)
 		{
-			if (!Directory.Exists(LayoutRoot))
+			if (!Directory.Exists(_layoutsFolder))
 				return;
 
-			var files = Directory.GetFiles(LayoutRoot, "*.json");
+			var files = Directory.GetFiles(_layoutsFolder, "*.json");
 
 			foreach (var file in files)
 			{

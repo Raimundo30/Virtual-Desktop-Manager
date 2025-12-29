@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Helpers
@@ -25,21 +26,21 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 				IntPtr desktopHandle = GetDesktopListViewHandle();
 				if (desktopHandle == IntPtr.Zero)
 				{
-					Console.WriteLine("[DesktopIconHelper] Failed to get desktop ListView handle");
+					Debug.WriteLine("[DesktopIconHelper] Failed to get desktop ListView handle");
 					return positions;
 				}
 
-				Console.WriteLine($"[DesktopIconHelper] Desktop handle: 0x{desktopHandle:X}");
+				Debug.WriteLine($"[DesktopIconHelper] Desktop handle: 0x{desktopHandle:X}");
 
 				// Get the count of icons
 				IntPtr result = SendMessage(desktopHandle, LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero);
 				int iconCount = result.ToInt32();
 
-				Console.WriteLine($"[DesktopIconHelper] Icon count: {iconCount}");
+				Debug.WriteLine($"[DesktopIconHelper] Icon count: {iconCount}");
 
 				if (iconCount == 0)
 				{
-					Console.WriteLine("[DesktopIconHelper] No icons found on desktop");
+					Debug.WriteLine("[DesktopIconHelper] No icons found on desktop");
 					return positions;
 				}
 
@@ -56,13 +57,13 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 
 						if (string.IsNullOrEmpty(name))
 						{
-							Console.WriteLine($"[DesktopIconHelper] Icon {i}: Empty name, skipping");
+							Debug.WriteLine($"[DesktopIconHelper] Icon {i}: Empty name, skipping");
 							continue;
 						}
 
 						if (position == Point.Empty)
 						{
-							Console.WriteLine($"[DesktopIconHelper] Icon {i} ({name}): Invalid position, skipping");
+							Debug.WriteLine($"[DesktopIconHelper] Icon {i} ({name}): Invalid position, skipping");
 							continue;
 						}
 
@@ -78,17 +79,17 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 							IsPrimaryScreen = screenInfo.IsPrimary
 						});
 
-						Console.WriteLine($"[DesktopIconHelper] Icon {i}: {name} at ({position.X}, {position.Y}) on screen {screenInfo.Index}");
+						Debug.WriteLine($"[DesktopIconHelper] Icon {i}: {name} at ({position.X}, {position.Y}) on screen {screenInfo.Index}");
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"[DesktopIconHelper] Error processing icon {i}: {ex.Message}");
+						Debug.WriteLine($"[DesktopIconHelper] Error processing icon {i}: {ex.Message}");
 					}
 				}
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[DesktopIconHelper] GetIconPositions error: {ex.Message}");
+				Debug.WriteLine($"[DesktopIconHelper] GetIconPositions error: {ex.Message}");
 			}
 
 			return positions;
@@ -107,12 +108,12 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 				IntPtr desktopHandle = GetDesktopListViewHandle();
 				if (desktopHandle == IntPtr.Zero)
 				{
-					Console.WriteLine("[DesktopIconHelper] Failed to get desktop ListView handle for setting positions");
+					Debug.WriteLine("[DesktopIconHelper] Failed to get desktop ListView handle for setting positions");
 					return;
 				}
 
 				int iconCount = (int)SendMessage(desktopHandle, LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero);
-				Console.WriteLine($"[DesktopIconHelper] Setting positions for {positions.Count} icons (desktop has {iconCount} icons)");
+				Debug.WriteLine($"[DesktopIconHelper] Setting positions for {positions.Count} icons (desktop has {iconCount} icons)");
 
 				foreach (var iconPos in positions)
 				{
@@ -120,7 +121,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 					int iconIndex = FindIconByName(desktopHandle, iconCount, iconPos.Name);
 					if (iconIndex == -1)
 					{
-						Console.WriteLine($"[DesktopIconHelper] Icon '{iconPos.Name}' not found on desktop");
+						Debug.WriteLine($"[DesktopIconHelper] Icon '{iconPos.Name}' not found on desktop");
 						continue;
 					}
 
@@ -135,12 +136,12 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 
 					// Set the icon position
 					SetIconPosition(desktopHandle, iconIndex, newPosition);
-					Console.WriteLine($"[DesktopIconHelper] Moved '{iconPos.Name}' to ({newPosition.X}, {newPosition.Y})");
+					Debug.WriteLine($"[DesktopIconHelper] Moved '{iconPos.Name}' to ({newPosition.X}, {newPosition.Y})");
 				}
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[DesktopIconHelper] SetIconPositions error: {ex.Message}");
+				Debug.WriteLine($"[DesktopIconHelper] SetIconPositions error: {ex.Message}");
 			}
 		}
 
@@ -178,7 +179,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 		{
 			// Try method 1: Progman -> SHELLDLL_DefView -> SysListView32
 			IntPtr progman = FindWindow("Progman", null);
-			Console.WriteLine($"[DesktopIconHelper] Progman handle: 0x{progman:X}");
+			Debug.WriteLine($"[DesktopIconHelper] Progman handle: 0x{progman:X}");
 
 			if (progman != IntPtr.Zero)
 			{
@@ -187,12 +188,12 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 				SendMessage(progman, 0x052C, new IntPtr(0xD), new IntPtr(1));
 
 				IntPtr defView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
-				Console.WriteLine($"[DesktopIconHelper] SHELLDLL_DefView handle: 0x{defView:X}");
+				Debug.WriteLine($"[DesktopIconHelper] SHELLDLL_DefView handle: 0x{defView:X}");
 
 				if (defView != IntPtr.Zero)
 				{
 					IntPtr listView = FindWindowEx(defView, IntPtr.Zero, "SysListView32", "FolderView");
-					Console.WriteLine($"[DesktopIconHelper] SysListView32 handle: 0x{listView:X}");
+					Debug.WriteLine($"[DesktopIconHelper] SysListView32 handle: 0x{listView:X}");
 
 					if (listView != IntPtr.Zero)
 						return listView;
@@ -200,7 +201,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 			}
 
 			// Try method 2: Enumerate all windows to find WorkerW -> SHELLDLL_DefView -> SysListView32
-			Console.WriteLine("[DesktopIconHelper] Trying WorkerW enumeration...");
+			Debug.WriteLine("[DesktopIconHelper] Trying WorkerW enumeration...");
 
 			IntPtr shellDefViewParent = IntPtr.Zero;
 			EnumWindows((topHandle, _) =>
@@ -208,7 +209,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 				IntPtr defView = FindWindowEx(topHandle, IntPtr.Zero, "SHELLDLL_DefView", null);
 				if (defView != IntPtr.Zero)
 				{
-					Console.WriteLine($"[DesktopIconHelper] Found SHELLDLL_DefView in window: 0x{topHandle:X}");
+					Debug.WriteLine($"[DesktopIconHelper] Found SHELLDLL_DefView in window: 0x{topHandle:X}");
 					shellDefViewParent = topHandle;
 					return false; // Stop enumeration
 				}
@@ -223,13 +224,13 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 					IntPtr listView = FindWindowEx(defView, IntPtr.Zero, "SysListView32", "FolderView");
 					if (listView != IntPtr.Zero)
 					{
-						Console.WriteLine($"[DesktopIconHelper] Found SysListView32 via enumeration: 0x{listView:X}");
+						Debug.WriteLine($"[DesktopIconHelper] Found SysListView32 via enumeration: 0x{listView:X}");
 						return listView;
 					}
 				}
 			}
 
-			Console.WriteLine("[DesktopIconHelper] Failed to find desktop ListView");
+			Debug.WriteLine("[DesktopIconHelper] Failed to find desktop ListView");
 			return IntPtr.Zero;
 		}
 
@@ -242,7 +243,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 			IntPtr hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, false, processId);
 			if (hProcess == IntPtr.Zero)
 			{
-				Console.WriteLine($"[DesktopIconHelper] Failed to open process for icon {itemIndex}");
+				Debug.WriteLine($"[DesktopIconHelper] Failed to open process for icon {itemIndex}");
 				return string.Empty;
 			}
 
@@ -251,7 +252,7 @@ namespace Virtual_Desktop_Manager.Core.Helpers
 				IntPtr ptrRemoteBuffer = VirtualAllocEx(hProcess, IntPtr.Zero, new UIntPtr(maxTextLength * 2), MEM_COMMIT, PAGE_READWRITE);
 				if (ptrRemoteBuffer == IntPtr.Zero)
 				{
-					Console.WriteLine($"[DesktopIconHelper] Failed to allocate memory for icon {itemIndex}");
+					Debug.WriteLine($"[DesktopIconHelper] Failed to allocate memory for icon {itemIndex}");
 					return string.Empty;
 				}
 
