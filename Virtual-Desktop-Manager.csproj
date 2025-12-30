@@ -36,11 +36,8 @@
   </ItemGroup>
 
   <ItemGroup>
-<<<<<<< HEAD
     <Folder Include="Docs\Screenshots\" />
-=======
     <Folder Include="Docs\Screenshoots\" />
->>>>>>> 059067a9f731e17ff38fb1b49d97b3c771315387
     <Folder Include="Features\CopyPasteFix\" />
     <Folder Include="Features\FollowAlong\" />
     <Folder Include="Features\Shortcuts\" />
