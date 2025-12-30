@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms.VisualStyles;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Services
@@ -19,9 +20,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 	public class DesktopFolderManager
 	{
 		/// <summary>
-		/// Occurs when an error is encountered during operation.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		private readonly string _rootFolderPath;
 		private readonly string _defaultDesktopPath;
@@ -89,18 +90,16 @@ namespace Virtual_Desktop_Manager.Core.Services
 				{
 					Debug.WriteLine($"[DesktopFolderManager] SHGetSetFolderCustomSettings failed with HRESULT: 0x{hr:X8}");
 				}
-
-				// Notify Windows Explorer to refresh the folder
-				//SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSH, Marshal.StringToHGlobalUni(_rootFolderPath), IntPtr.Zero);
-				//Debug.WriteLine($"[DesktopFolderManager] Shell notified with SHCNE_UPDATEITEM");
-
-				//Debug.WriteLine($"[DesktopFolderManager] === SetRootFolderIcon COMPLETE ===");
 			}
 			catch (Exception ex)
 			{
-				Debug.WriteLine($"[DesktopFolderManager] ERROR in SetRootFolderIcon: {ex.Message}");
-				Debug.WriteLine($"[DesktopFolderManager] Stack trace: {ex.StackTrace}");
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Warning,                                               // = Severity
+					"Icon setup error",                                                         // = Source
+					$"An error occurred while setting the desktop folder icon: {ex.Message}",   // = Message
+					NotificationDuration.Short,                                                 // = Duration
+					ex                                                                          // = Exception
+				));
 			}
 		}
 
@@ -201,7 +200,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 			if (hr != 0)
 			{
 				var ex = new COMException($"SHSetKnownFolderPath failed with HRESULT 0x{hr:X8}", hr);
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,							// = Severity
+					"Desktop Switch Failed",							// = Source
+					$"Failed to switch desktop path: {ex.Message}",		// = Message
+					NotificationDuration.Short,							// = Duration
+					ex													// = Exception
+				));
 				throw ex;
 			}
 		}

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows.Forms;
+using Virtual_Desktop_Manager.Core.Events;
 
 namespace Virtual_Desktop_Manager.Core.Services
 {
@@ -14,9 +15,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		private readonly AppCore _core;
 
 		/// <summary>
-		/// Occurs when an error is encountered during operation.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		public UninstallManager(AppCore core)
 		{
@@ -64,7 +65,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 					//	}
 					//	catch (Exception deleteEx)
 					//	{
-					//		Debug.WriteLine($"[UninstallManager] Warning: Could not delete Common folder: {deleteEx.Message}");
+					//		Notification?.Invoke(this, new NotificationEventArgs(
+					//			NotificationSeverity.Error,												// = Severity
+					//			"Uninstall Error",														// = Source
+					//			$"An error occurred while deleting Common folder: {deleteEx.Message}",  // = Message
+					//			NotificationDuration.Long,                                              // = Duration
+					//			deleteEx                                                                // = Exception
+					//		));
 					//	}
 					//}
 
@@ -79,7 +86,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 				}
 				catch (Exception ex)
 				{
-					ErrorOccurred?.Invoke(ex);
+					Notification?.Invoke(this, new NotificationEventArgs(
+						NotificationSeverity.Error,                                         // = Severity
+						"Uninstall Error",						                            // = Source
+						$"An error occurred during uninstallation: {ex.Message}",			// = Message
+						NotificationDuration.Long,                                          // = Duration
+						ex                                                                  // = Exception
+					));
 				}
 
 				MessageBox.Show(

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Timers;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Helpers;
 using static Virtual_Desktop_Manager.Core.Helpers.VirtualDesktopInterop;
 
@@ -16,9 +17,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 	public class VirtualDesktopService : IDisposable
 	{
 		/// <summary>
-		/// Occurs when an error is encountered during operation.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		/// <summary>
 		/// Occurs when a change to the current desktop is detected.
@@ -61,9 +62,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// <summary>
 		/// Initializes the COM interface required for virtual desktop management operations.
 		/// </summary>
-		/// <remarks>If initialization fails, the method triggers the <see cref="ErrorOccurred"/> event with the
-		/// encountered exception. This method should be called before performing any actions that depend on the virtual
-		/// desktop manager COM interface.</remarks>
+		/// <remarks>If initialization fails, the method raises a notification event with the
+		/// encountered exception. This method should be called before performing any actions 
+		/// that depend on the virtual desktop manager COM interface.</remarks>
 		private void InitializeCOM()
 		{
 			try
@@ -72,7 +73,12 @@ namespace Virtual_Desktop_Manager.Core.Services
 				var shellType = Type.GetTypeFromCLSID(VirtualDesktopInterop.CLSID_ImmersiveShell);
 				if (shellType == null)
 				{
-					ErrorOccurred?.Invoke(new COMException("Failed to get ImmersiveShell COM type"));
+					Notification?.Invoke(this, new NotificationEventArgs(
+						NotificationSeverity.Error,															// = Severity
+						"Virtual Desktop Service",															// = Source
+						"Failed to initialize Virtual Desktop Service: ImmersiveShell COM type not found.", // = Message
+						NotificationDuration.Long															// = Duration
+					));
 					return;
 				}
 
@@ -107,12 +113,23 @@ namespace Virtual_Desktop_Manager.Core.Services
 
 				if (!success)
 				{
-					ErrorOccurred?.Invoke(new COMException("Failed to initialize Virtual Desktop COM interface with any known IID"));
+					Notification?.Invoke(this, new NotificationEventArgs(
+						NotificationSeverity.Error,                                                         // = Severity
+						"Virtual Desktop Service",                                                          // = Source
+						"Failed to initialize Virtual Desktop Service: Unable to obtain IVirtualDesktopManagerInternal interface.", // = Message
+						NotificationDuration.Long                                                           // = Duration
+					));
 				}
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                                    // = Severity
+					"Virtual Desktop Service",                                     // = Source
+					$"Failed to initialize Virtual Desktop Service: {ex.Message}", // = Message
+					NotificationDuration.Long,                                     // = Duration
+					ex                                                             // = Exception
+				));
 			}
 		}
 
@@ -139,14 +156,20 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,														// = Severity
+					"Virtual Desktop Service",														// = Source
+					$"Failed to query IVirtualDesktopManagerInternal with IID {iid}: {ex.Message}", // = Message
+					NotificationDuration.Long,														// = Duration
+					ex																				// = Exception
+				));
 				return false;
 			}
 		}
 
 		/// <summary>
 		/// Gets the current virtual desktop ID.
-		/// If retrieval fails, returns Guid.Empty and triggers the <see cref="ErrorOccurred"/> event.
+		/// If retrieval fails, returns Guid.Empty and raises a notification event.
 		/// </summary>
 		/// <returns>Guid representing the current virtual desktop.</returns>
 		public Guid GetCurrentDesktopId()
@@ -171,12 +194,24 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (COMException ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                        // = Severity
+					"Virtual Desktop Service",                         // = Source
+					$"Failed to get current desktop ID: {ex.Message}", // = Message
+					NotificationDuration.Long,                         // = Duration
+					ex                                                 // = Exception
+				));
 				return Guid.Empty;
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                        // = Severity
+					"Virtual Desktop Service",                         // = Source
+					$"Failed to get current desktop ID: {ex.Message}", // = Message
+					NotificationDuration.Long,                         // = Duration
+					ex                                                 // = Exception
+				));
 				return Guid.Empty;
 			}
 		}
@@ -252,11 +287,23 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (COMException ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,							// = Severity
+					"Virtual Desktop Service",							// = Source
+					$"Failed to list Desktop ID: {ex.Message}",			// = Message
+					NotificationDuration.Long,							// = Duration
+					ex													// = Exception
+				));
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,							// = Severity
+					"Virtual Desktop Service",							// = Source
+					$"Failed to list Desktop ID: {ex.Message}",			// = Message
+					NotificationDuration.Long,							// = Duration
+					ex													// = Exception
+				));
 			}
 
 			return desktopIds;
@@ -359,13 +406,23 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (COMException ex)
 			{
-				ErrorOccurred?.Invoke(ex);
-				Debug.WriteLine($"[VirtualDesktopService] COM Exception: {ex.Message}");
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                        // = Severity
+					"Virtual Desktop Service",                         // = Source
+					$"Failed to get desktop info: {ex.Message}",       // = Message
+					NotificationDuration.Long,                         // = Duration
+					ex                                                 // = Exception
+				));
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
-				Debug.WriteLine($"[VirtualDesktopService] Exception: {ex.Message}");
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                        // = Severity
+					"Virtual Desktop Service",                         // = Source
+					$"Failed to get desktop info: {ex.Message}",       // = Message
+					NotificationDuration.Long,                         // = Duration
+					ex                                                 // = Exception
+				));
 			}
 
 			return desktopInfo;
@@ -397,11 +454,23 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (COMException ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,									// = Severity
+					"Virtual Desktop Service",									// = Source
+					$"Failed to switch to desktop {desktopId}: {ex.Message}",	// = Message
+					NotificationDuration.Long,									// = Duration
+					ex															// = Exception
+				));
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                                 // = Severity
+					"Virtual Desktop Service",                                  // = Source
+					$"Failed to switch to desktop {desktopId}: {ex.Message}",   // = Message
+					NotificationDuration.Long,                                  // = Duration
+					ex                                                          // = Exception
+				));
 			}
 
 			return false;

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using Virtual_Desktop_Manager.Core;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Models;
 using Virtual_Desktop_Manager.Core.Services;
 
@@ -20,14 +21,9 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 		private readonly AppCore _core;
 
 		/// <summary>
-		/// Occurs when an informational message is generated.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<string, string, string>? Message;
-
-		/// <summary>
-		/// Occurs when an error is encountered during the execution of the component.
-		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		/// <summary>
 		/// Initializes the system tray icon with context menu.
@@ -100,7 +96,13 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                         // = Severity
+					"Tray Icon",										// = Source
+					$"Error displaying tray icon menu: {ex.Message}",	// = Message
+					NotificationDuration.Long,                          // = Duration
+					ex                                                  // = Exception
+				));
 			}
 		}
 
@@ -119,13 +121,16 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 			{
 				Enabled = false
 			};
-			Debug.WriteLine("[TrayIcon] Header item created");
 			contextMenu.Items.Add(statusItem);
-			Debug.WriteLine("[TrayIcon] Header item added");
 			contextMenu.Items.Add(new ToolStripSeparator());
-			Debug.WriteLine("[TrayIcon] Separator added");
 
-			// 2. Switch to Desktop submenu
+			// 2. Reload Icon Layout for Current Desktop
+			var reloadLayoutItem = new ToolStripMenuItem("Reload Icon Layout");
+			reloadLayoutItem.Click += (s, e) => _core.IconLayoutManager.LoadLayout();
+			contextMenu.Items.Add(reloadLayoutItem);
+			contextMenu.Items.Add(new ToolStripSeparator());
+
+			// 3. Switch to Desktop submenu
 			var switchDesktopMenu = new ToolStripMenuItem("Switch to Desktop");
 			var desktopInfo = _core.DesktopService.GetDesktopInfo();
 			var currentDesktopId = _core.DesktopService.LastDesktopId;
@@ -147,7 +152,7 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 			contextMenu.Items.Add(switchDesktopMenu);
 			contextMenu.Items.Add(new ToolStripSeparator());
 
-			// 3. Open Folders submenu
+			// 4. Open Folders submenu
 			var openFoldersMenu = new ToolStripMenuItem("Open Folders");
 
 			// Default desktop folder
@@ -179,7 +184,7 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 			contextMenu.Items.Add(openFoldersMenu);
 			contextMenu.Items.Add(new ToolStripSeparator());
 
-			// 4. Startup toggle
+			// 5. Startup toggle
 			bool startupEnabled = _core.StartupManager.IsStartupEnabled;
 			var startupItem = new ToolStripMenuItem("Start with Windows")
 			{
@@ -190,14 +195,14 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 
 			contextMenu.Items.Add(new ToolStripSeparator());
 
-			// 5. Uninstall
+			// 6. Uninstall and Exit
 			var uninstallItem = new ToolStripMenuItem("Uninstall and Exit");
 			uninstallItem.Click += OnUninstallAndExit;
 			contextMenu.Items.Add(uninstallItem);
 
 			contextMenu.Items.Add(new ToolStripSeparator());
 
-			// 6. Exit
+			// 7. Exit
 			Debug.WriteLine("[TrayIcon] Creating exit item");
 			var exitItem = new ToolStripMenuItem("Exit");
 			Debug.WriteLine("[TrayIcon] Exit item created");
@@ -276,8 +281,12 @@ namespace Virtual_Desktop_Manager.UI.TrayIcon
 				? "Virtual Desktop Manager will now start with Windows." 
 				: "Virtual Desktop Manager will no longer start with Windows.";
 
-			Message?.Invoke("ℹ️", "Startup with windows", message);
-			Debug.WriteLine("[TrayIcon] " + message);
+			Notification?.Invoke(this, new NotificationEventArgs(
+				NotificationSeverity.Info,		// = Severity
+				"Startup with Windows",			// = Source
+				message,						// = Message
+				NotificationDuration.Short		// = Duration
+			));
 		}
 
 		/// <summary>

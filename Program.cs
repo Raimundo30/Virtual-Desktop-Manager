@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Windows.Forms;
 using Virtual_Desktop_Manager.Core;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Models;
 using Virtual_Desktop_Manager.Core.Services;
 using Virtual_Desktop_Manager.UI.AppWindow;
@@ -17,7 +18,7 @@ namespace Virtual_Desktop_Manager
 	{
 		private static AppCore? _core;
 		private static TrayIcon? _trayIcon;
-		private static NotificationManager? _notify;
+		private static NotificationManager? _notification;
 
 		/// <summary>
 		///  The main entry point for the application.
@@ -43,20 +44,18 @@ namespace Virtual_Desktop_Manager
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
 
+			// Set up notification manager
+			_notification = new NotificationManager();
+
 			// Initialize and start the core application logic
 			_core = new AppCore();
-			_core.ErrorOccurred += OnCoreError;
-			_core.Message += OnMessage;
+			_core.Notification += OnNotificationRequested;
 			_core.DesktopSwitched += OnDesktopSwitched;
 			_core.Start();
 
 			// Set up the tray icon
 			_trayIcon = new TrayIcon(_core);
-			_trayIcon.ErrorOccurred += OnCoreError;
-			_trayIcon.Message += OnMessage;
-
-			// Set up notification manager
-			_notify = new NotificationManager();
+			_trayIcon.Notification += OnNotificationRequested;
 
 			// Run the application (keeps it alive until 'Exit' is called)
 			Application.Run();
@@ -64,33 +63,25 @@ namespace Virtual_Desktop_Manager
 			// Cleanup when app closes
 			_core.Dispose();
 			_trayIcon.Dispose();
-			_notify.Dispose();
+			_notification.Dispose();
 		}
 
 		/// <summary>
-		/// Handles errors that occur in the core logic by displaying an error message to the user.
+		/// Handles notification requests from the core and tray icon by displaying a toast notification
 		/// </summary>
-		/// <param name="ex">The exception that represents the error encountered in the core logic. Cannot be null.</param>
-		private static void OnCoreError(Exception ex)
+		/// <param name="sender">The source of the notification event.</param>
+		/// <param name="e">The notification event arguments containing details about the notification.</param>
+		private static void OnNotificationRequested(object? sender, NotificationEventArgs e)
 		{
-			// Show a toast notification for the error
-			_notify?.ShowToast("Error", ex.Message, NotificationManager.ToastDuration.Long, "❌ ");
+			_notification?.ShowToast(e);
 
-			// Also log to Debug output
-			Debug.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: {ex.Message}");
-		}
-
-		/// <summary>
-		/// Handles informational messages from the core logic by displaying them to the user.
-		/// </summary>
-		/// <param name="message">The informational message from the core logic. Cannot be null or empty.</param>
-		private static void OnMessage(string type, string source, string message)
-		{
-			// Show a toast notification for the message
-			_notify?.ShowToast(source, message, NotificationManager.ToastDuration.Short, type + " ");
+			var level = e.Severity == NotificationSeverity.Error ? "ERROR" : e.Severity.ToString().ToUpperInvariant();
+			Debug.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{level}] [{e.Source}] {e.Message}");
 			
-			// Also log to Debug output
-			Debug.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{source}] {message}");
+			if (e.Exception != null)
+			{
+				Debug.WriteLine($"[{DateTime.Now:HH:mm:ss}] Exception: {e.Exception}");
+			}
 		}
 
 		/// <summary>

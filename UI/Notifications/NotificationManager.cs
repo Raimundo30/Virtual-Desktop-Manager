@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.Windows.Forms;
+using Virtual_Desktop_Manager.Core.Events;
 
 namespace Virtual_Desktop_Manager.UI.Notifications
 {
@@ -43,6 +44,18 @@ namespace Virtual_Desktop_Manager.UI.Notifications
 				Debug.WriteLine($"[Notification] {title}: {message}");
 				Debug.WriteLine($"[Notification Error] {ex.Message}");
 			}
+		}
+
+		/// <summary>
+		/// Shows a Windows toast notification from NotificationEventArgs.
+		/// </summary>
+		public void ShowToast(NotificationEventArgs args)
+		{
+			var duration = args.Duration == NotificationDuration.Long 
+				? ToastDuration.Long 
+				: ToastDuration.Short;
+			
+			ShowToast(args.Source, args.Message, duration, args.Icon + " ");
 		}
 
 		/// <summary>

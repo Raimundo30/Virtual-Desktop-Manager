@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Windows.Forms;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Models;
 
 namespace Virtual_Desktop_Manager.Core.Services
@@ -15,9 +17,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 		private readonly string _binFolder;
 
 		/// <summary>
-		/// Occurs when an error is encountered during operation.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="CleanupManager"/> class.
@@ -40,12 +42,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 		/// <param name="activeDesktopIds">List of currently active desktop IDs.</param>
 		public void CleanupUnusedDesktopFolders(List<Guid> activeDesktopIds)
 		{
+			// Check if desktops folder exists
+			if (!Directory.Exists(_desktopsFolder))
+				return;
+
 			// Ensure the Bin folder exists
 			if (!Directory.Exists(_binFolder))
 				Directory.CreateDirectory(_binFolder);
-
-			if (!Directory.Exists(_desktopsFolder))
-				return;
 
 			var desktopFolders = Directory.GetDirectories(_desktopsFolder);
 
@@ -143,7 +146,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Warning,                       // = Severity
+					"Cleanup Error",                                    // = Source
+					$"An error occurred during cleanup: {ex.Message}",  // = Message
+					NotificationDuration.Long,                          // = Duration
+					ex                                                  // = Exception
+				));
 			}
 		}
 	}

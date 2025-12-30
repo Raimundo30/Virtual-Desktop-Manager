@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Models;
 using Virtual_Desktop_Manager.Core.Services;
 
@@ -39,14 +40,9 @@ namespace Virtual_Desktop_Manager.Core
 		public event Action<Guid>? DesktopSwitched;
 
 		/// <summary>
-		/// Occurs when an informational message is generated.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<string, string, string>? Message;
-
-		/// <summary>
-		/// Occurs when an error is encountered during the execution of the component.
-		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		/// <summary>
 		/// Gets the virtual desktop service for managing desktop operations and monitoring.
@@ -74,6 +70,11 @@ namespace Virtual_Desktop_Manager.Core
 		public StartupManager StartupManager => _startupManager;
 
 		/// <summary>
+		/// Gets the icon layout manager for saving and loading desktop icon layouts.
+		/// </summary>
+		public IconLayoutManager IconLayoutManager => _iconManager;
+
+		/// <summary>
 		/// Gets the uninstall manager for application uninstallation.
 		/// </summary>
 		public UninstallManager UninstallManager => _uninstallManager;
@@ -95,11 +96,11 @@ namespace Virtual_Desktop_Manager.Core
 			_desktopService.DesktopChanged += OnDesktopChanged;
 
 			// Forward errors from services
-			_desktopService.ErrorOccurred += (ex) => ErrorOccurred?.Invoke(ex);
-			_iconManager.ErrorOccurred += (ex) => ErrorOccurred?.Invoke(ex);
-			_folderManager.ErrorOccurred += (ex) => ErrorOccurred?.Invoke(ex);
-			_cleanupManager.ErrorOccurred += (ex) => ErrorOccurred?.Invoke(ex);
-			_uninstallManager.ErrorOccurred += (ex) => ErrorOccurred?.Invoke(ex);
+			_desktopService.Notification += (sender, args) => Notification?.Invoke(sender, args);
+			_iconManager.Notification += (sender, args) => Notification?.Invoke(sender, args);
+			_folderManager.Notification += (sender, args) => Notification?.Invoke(sender, args);
+			_cleanupManager.Notification += (sender, args) => Notification?.Invoke(sender, args);
+			_uninstallManager.Notification += (sender, args) => Notification?.Invoke(sender, args);
 		}
 
 		/// <summary>
@@ -110,6 +111,12 @@ namespace Virtual_Desktop_Manager.Core
 			_desktopService.Start();
 
 			OnDesktopChanged(_desktopService.LastDesktopId);
+
+			Notification?.Invoke(this, new NotificationEventArgs(
+				NotificationSeverity.Info,                      // = Severity
+				"App Started",                                  // = Source
+				"Virtual Desktop Manager started monitoring.",	// = Message
+				NotificationDuration.Short));                   // = Duration
 		}
 
 		/// <summary>
@@ -121,6 +128,12 @@ namespace Virtual_Desktop_Manager.Core
 
 			// Optionally, switch back to the default desktop folder on stop
 			OnDesktopChanged(Guid.Empty);
+
+			Notification?.Invoke(this, new NotificationEventArgs(
+				NotificationSeverity.Info,                      // = Severity
+				"App Stopped",                                  // = Source
+				"Virtual Desktop Manager stopped monitoring.",  // = Message
+				NotificationDuration.Short));                   // = Duration
 		}
 
 		/// <summary>
@@ -168,7 +181,7 @@ namespace Virtual_Desktop_Manager.Core
 			}
 			catch (Exception ex)
 			{
-				ErrorOccurred?.Invoke(ex);
+				Debug.WriteLine($"[AppCore] Error during desktop switch: {ex.Message}");
 			}
 			finally
 			{

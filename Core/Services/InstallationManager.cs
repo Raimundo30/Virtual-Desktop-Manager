@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Reflection;
 using Virtual_Desktop_Manager.Core.Models;
 
@@ -36,6 +38,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 				// Ensure Root folder exists
 				if (!Directory.Exists(paths.Root))
 					Directory.CreateDirectory(paths.Root);
+
+				// Ensure there is no other instance running from Common folder
+				CloseRunningInstances(paths);
 
 				// Clean existing Common folder for fresh installation
 				if (Directory.Exists(paths.Common))
@@ -102,6 +107,95 @@ namespace Virtual_Desktop_Manager.Core.Services
 			string normalizedCommon = Path.GetFullPath(paths.Exe).TrimEnd(Path.DirectorySeparatorChar);
 
 			return string.Equals(normalizedCurrent, normalizedCommon, StringComparison.OrdinalIgnoreCase);
+		}
+
+		/// <summary>
+		/// Closes any running instances of the application from the Common folder.
+		/// </summary>
+		/// <param name="paths">Paths configuration.</param>
+		private static void CloseRunningInstances(Paths paths)
+		{
+			try
+			{
+				var currentProcess = Process.GetCurrentProcess();
+				string currentProcessName = currentProcess.ProcessName;
+				string commonExePath = Path.GetFullPath(paths.Exe);
+
+				Debug.WriteLine($"[InstallationManager] Checking for running instances of {currentProcessName}...");
+
+				// Get all processes with the same name
+				var runningProcesses = Process.GetProcessesByName(currentProcessName)
+					.Where(p => p.Id != currentProcess.Id) // Exclude current process
+					.ToList();
+
+				if (runningProcesses.Count == 0)
+				{
+					Debug.WriteLine("[InstallationManager] No other instances found");
+					return;
+				}
+
+				Debug.WriteLine($"[InstallationManager] Found {runningProcesses.Count} other instance(s)");
+
+				foreach (var process in runningProcesses)
+				{
+					try
+					{
+						string processPath = process.MainModule?.FileName ?? string.Empty;
+
+						if (string.IsNullOrEmpty(processPath))
+						{
+							Debug.WriteLine($"[InstallationManager] Could not determine path for process ID {process.Id}");
+							continue;
+						}
+
+						string normalizedProcessPath = Path.GetFullPath(processPath).TrimEnd(Path.DirectorySeparatorChar);
+
+						// Check if this process is running from the Common folder
+						if (string.Equals(normalizedProcessPath, commonExePath, StringComparison.OrdinalIgnoreCase))
+						{
+							Debug.WriteLine($"[InstallationManager] Closing instance running from Common folder (PID: {process.Id})");
+
+							// Attempt graceful shutdown first
+							if (!process.CloseMainWindow())
+							{
+								Debug.WriteLine($"[InstallationManager] CloseMainWindow failed for PID {process.Id}, waiting for exit...");
+							}
+
+							// Wait up to 5 seconds for graceful shutdown
+							if (!process.WaitForExit(5000))
+							{
+								Debug.WriteLine($"[InstallationManager] Process {process.Id} did not exit gracefully, forcing termination");
+								process.Kill();
+								process.WaitForExit(2000); // Wait a bit after kill
+							}
+
+							Debug.WriteLine($"[InstallationManager] Process {process.Id} closed successfully");
+						}
+						else
+						{
+							Debug.WriteLine($"[InstallationManager] Ignoring instance not running from Common folder: {processPath}");
+						}
+					}
+					catch (Exception ex)
+					{
+						Debug.WriteLine($"[InstallationManager] Error closing process {process.Id}: {ex.Message}");
+					}
+					finally
+					{
+						process.Dispose();
+					}
+				}
+
+				// Give the system a moment to release file handles
+				Thread.Sleep(500);
+
+				Debug.WriteLine("[InstallationManager] Finished closing running instances");
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine($"[InstallationManager] Error in CloseRunningInstances: {ex.Message}");
+				// Non-critical error, continue with installation
+			}
 		}
 
 		/// <summary>

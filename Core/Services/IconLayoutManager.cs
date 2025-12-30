@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
+using Virtual_Desktop_Manager.Core.Events;
 using Virtual_Desktop_Manager.Core.Helpers;
 using Virtual_Desktop_Manager.Core.Models;
 
@@ -14,9 +15,9 @@ namespace Virtual_Desktop_Manager.Core.Services
 	public class IconLayoutManager
 	{
 		/// <summary>
-		/// Occurs when an error is encountered during operation.
+		/// Occurs when a notification should be displayed to the user.
 		/// </summary>
-		public event Action<Exception>? ErrorOccurred;
+		public event EventHandler<NotificationEventArgs>? Notification;
 
 		/// <summary>
 		/// Root folder where icon layout files are stored.
@@ -82,8 +83,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (Exception ex)
 			{
-				Debug.WriteLine($"[IconLayoutManager] SaveLayout error: {ex.Message}");
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                                         // = Severity
+					"Icon Layout Manager",                                         // = Source
+					$"An error occurred while saving the icon layout: {ex.Message}",    // = Message
+					NotificationDuration.Short,                                         // = Duration
+					ex                                                                  // = Exception
+				));
 			}
 		}
 
@@ -123,8 +129,13 @@ namespace Virtual_Desktop_Manager.Core.Services
 			}
 			catch (Exception ex)
 			{
-				Debug.WriteLine($"[IconLayoutManager] LoadLayout error: {ex.Message}");
-				ErrorOccurred?.Invoke(ex);
+				Notification?.Invoke(this, new NotificationEventArgs(
+					NotificationSeverity.Error,                                         // = Severity
+					"Icon Layout Manager",                                        // = Source
+					$"An error occurred while loading the icon layout: {ex.Message}",   // = Message
+					NotificationDuration.Short,                                         // = Duration
+					ex                                                                  // = Exception
+				));
 			}
 		}
 
