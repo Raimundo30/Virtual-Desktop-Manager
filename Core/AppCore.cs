@@ -113,7 +113,7 @@ namespace Virtual_Desktop_Manager.Core
 			OnDesktopChanged(_desktopService.LastDesktopId);
 
 			Notification?.Invoke(this, new NotificationEventArgs(
-				NotificationSeverity.Info,                      // = Severity
+				NotificationSeverity.Success,                      // = Severity
 				"App Started",                                  // = Source
 				"Virtual Desktop Manager started monitoring.",	// = Message
 				NotificationDuration.Short));                   // = Duration
