@@ -37,6 +37,45 @@ A Windows application that provides **separate desktop folders** for each Window
 - Configurable notification duration
 - Visual feedback for desktop switches and errors
 
+## 📸 Screenshots
+
+<div align="center">
+   <table style="border: none; border-collapse: separate;">
+     <tr>
+       <td align="center" width="50%">
+         <img src="Docs/Screenshots/tray-menu.png" alt="System Tray Menu" width="100%"/>
+         <sub><b>System Tray Menu</b></sub>
+         <br/>
+         <sub>Right-click to access all features</sub>
+         <br/><br/>
+       </td>
+       <td align="center" width="50%">
+         <img src="Docs/Screenshots/notification.png" alt="Toast Notification" width="100%"/>
+         <sub><b>Toast Notifications</b></sub>
+         <br/>
+         <sub>Real-time alerts and notifications</sub>
+         <br/><br/>
+       </td>
+     </tr>
+     <tr>
+       <td align="center" width="50%">
+         <img src="Docs/Screenshots/folder-structure.png" alt="Folder Structure" width="100%"/>
+         <sub><b>Organized Folder Structure</b></sub>
+         <br/>
+         <sub>Each desktop gets its own folder</sub>
+         <br/><br/>
+       </td>
+       <td align="center" width="50%">
+         <img src="Docs/Screenshots/virtual-desktops.png" alt="Virtual Desktops" width="100%"/>
+         <sub><b>Virtual Desktops Integration</b></sub>
+         <br/>
+         <sub>Seamless Windows integration</sub>
+         <br/><br/>
+       </td>
+     </tr>
+   </table>
+</div>
+
 ## 📋 Requirements
 
 - **OS**: Windows 10 (1903+) or Windows 11
